@@ -3,7 +3,15 @@
 @section('content')
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
     <h1 style="font-size: 2rem; font-weight: 800; margin: 0;">Trendyol Entegratör Yanıtı</h1>
-    <a href="{{ route('admin.settings') }}" class="btn" style="background: #e5e7eb; color: #374151;">Ayarları Düzenle</a>
+    <div style="display: flex; gap: 1rem;">
+        <form action="{{ route('admin.integration.sync') }}" method="POST">
+            @csrf
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-database"></i> Veritabanına Kaydet / Güncelle
+            </button>
+        </form>
+        <a href="{{ route('admin.settings') }}" class="btn" style="background: #e5e7eb; color: #374151;">Ayarları Düzenle</a>
+    </div>
 </div>
 
 @if(!$response)

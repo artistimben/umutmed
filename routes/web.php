@@ -53,6 +53,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/admin/sync-trendyol', [AdminPanelController::class, 'syncTrendyol'])->name('admin.sync-trendyol');
 
     Route::get('/admin/integration', [AdminPanelController::class, 'trendyolIntegration'])->name('admin.integration');
+    Route::post('/admin/integration/sync', [AdminPanelController::class, 'syncIntegrationProducts'])->name('admin.integration.sync');
 
     Route::get('/admin/settings', [AdminPanelController::class, 'storeSettings'])->name('admin.settings');
     Route::post('/admin/settings', [AdminPanelController::class, 'updateSettings'])->name('admin.settings.update');

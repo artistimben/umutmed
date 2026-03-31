@@ -96,6 +96,36 @@ class AdminPanelController extends Controller
         return view('admin.integration.index', compact('response'));
     }
 
+    public function syncIntegrationProducts(\App\Services\TrendyolService $trendyolService)
+    {
+        $response = $trendyolService->getIntegrationProducts(0, 100);
+        
+        if (!$response || !isset($response['content'])) {
+            return back()->with('error', 'Trendyol verileri alınamadı.');
+        }
+
+        $count = 0;
+        foreach ($response['content'] as $item) {
+            // Trendyol barcode üzerinden eşleştirme yaparak ürünleri kaydet/güncelle
+            Product::updateOrCreate(
+                ['barcode' => $item['barcode']],
+                [
+                    'title' => $item['title'] ?? ($item['modelCode'] ?? 'İsimsiz Ürün'),
+                    'slug' => \Illuminate\Support\Str::slug(($item['title'] ?? $item['modelCode']) . '-' . $item['barcode']),
+                    'price' => $item['listPrice'] ?? 0,
+                    'discounted_price' => $item['salePrice'] ?? null,
+                    'stock' => $item['quantity'] ?? 0,
+                    'is_active' => true,
+                    // Eğer detaylı veri gelmiyorsa, varsayılan bir kategori atayalım
+                    'category_id' => Category::firstOrCreate(['slug' => 'genel'], ['name' => 'Genel Ürünler'])->id,
+                ]
+            );
+            $count++;
+        }
+
+        return redirect()->route('admin.integration')->with('success', $count . ' adet ürün başarıyla veritabanına kaydedildi/güncellendi.');
+    }
+
     public function productManagement()
     {
         // CRUD logic later if needed
