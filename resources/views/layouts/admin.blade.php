@@ -20,6 +20,11 @@
                     </a>
                 </li>
                 <li class="sidebar-nav-item">
+                    <a href="{{ route('admin.integration') }}" class="sidebar-nav-link {{ request()->is('admin/integration*') ? 'active' : '' }}">
+                        <i class="fas fa-plug"></i> Trendyol Entegrasyonu
+                    </a>
+                </li>
+                <li class="sidebar-nav-item">
                     <a href="{{ route('admin.products') }}" class="sidebar-nav-link {{ request()->is('admin/products*') ? 'active' : '' }}">
                         <i class="fas fa-box"></i> Ürün Yönetimi
                     </a>

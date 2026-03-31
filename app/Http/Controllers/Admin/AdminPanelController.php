@@ -90,6 +90,12 @@ class AdminPanelController extends Controller
         return back()->with('success', 'Trendyol mağaza ayarları başarıyla güncellendi.');
     }
 
+    public function trendyolIntegration(\App\Services\TrendyolService $trendyolService)
+    {
+        $response = $trendyolService->getIntegrationProducts(0, 50);
+        return view('admin.integration.index', compact('response'));
+    }
+
     public function productManagement()
     {
         // CRUD logic later if needed

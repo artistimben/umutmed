@@ -61,4 +61,24 @@ class TrendyolService
         
         return null;
     }
+
+    /**
+     * Fetch products from the newer Integration API gateway (apigw)
+     */
+    public function getIntegrationProducts(int $page = 0, int $size = 50): ?array
+    {
+        $endpoint = "https://apigw.trendyol.com/integration/product/sellers/{$this->sellerId}/products";
+
+        $response = $this->client()->get($endpoint, [
+            'page' => $page,
+            'size' => $size,
+        ]);
+
+        if ($response->successful()) {
+            return $response->json();
+        }
+
+        Log::error('Trendyol APIGW Integration API failed: ' . $response->body());
+        return null;
+    }
 }
