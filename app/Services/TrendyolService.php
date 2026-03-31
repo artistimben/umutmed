@@ -26,12 +26,12 @@ class TrendyolService
      */
     protected function client()
     {
-        $userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+        // Trendyol Partner API kuralına göre: "SatıcıId - SelfIntegration"
+        $userAgent = "{$this->sellerId} - SelfIntegration";
         
         return Http::withBasicAuth($this->apiKey, $this->apiSecret)
             ->withHeaders([
                 'User-Agent' => $userAgent,
-                'x-agent-id' => $this->sellerId,
                 'Accept' => 'application/json'
             ]);
     }
