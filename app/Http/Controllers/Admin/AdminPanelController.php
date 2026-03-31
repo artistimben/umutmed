@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\Order;
 use App\Models\CurrentAccount;
 use App\Models\Category;
+use App\Models\Brand;
 use Illuminate\Support\Facades\Artisan;
 
 class AdminPanelController extends Controller
@@ -106,24 +107,52 @@ class AdminPanelController extends Controller
 
         $count = 0;
         foreach ($response['content'] as $item) {
-            // Trendyol barcode üzerinden eşleştirme yaparak ürünleri kaydet/güncelle
-            Product::updateOrCreate(
-                ['barcode' => $item['barcode']],
+            
+            // 1. Markayı Otomatik Oluştur/Eşleştir
+            $brandId = $item['brandId'] ?? null;
+            $brandName = $item['brandName'] ?? ($brandId ? "Marka #$brandId" : 'Markasız');
+            $brand = Brand::updateOrCreate(
+                ['external_id' => (string)$brandId, 'marketplace' => 'Trendyol'],
+                ['name' => $brandName, 'slug' => \Illuminate\Support\Str::slug($brandName . '-' . $brandId)]
+            );
+
+            // 2. Kategoriyi Otomatik Oluştur/Eşleştir
+            $catId = $item['pimCategoryId'] ?? null;
+            $catName = $item['categoryName'] ?? ($catId ? "Kategori #$catId" : 'Genel Ürünler');
+            $category = Category::updateOrCreate(
+                ['external_id' => (string)$catId, 'marketplace' => 'Trendyol'],
+                ['name' => $catName, 'slug' => \Illuminate\Support\Str::slug($catName . '-' . $catId)]
+            );
+
+            // 3. Ürünü Kaydet/Güncelle
+            $product = Product::updateOrCreate(
+                ['barcode' => $item['barcode'], 'marketplace' => 'Trendyol'],
                 [
                     'title' => $item['title'] ?? ($item['modelCode'] ?? 'İsimsiz Ürün'),
-                    'slug' => \Illuminate\Support\Str::slug(($item['title'] ?? $item['modelCode']) . '-' . $item['barcode']),
+                    'slug' => \Illuminate\Support\Str::slug(($item['title'] ?? $item['modelCode']) . '-' . ($item['barcode'] ?? $item['modelCode'])),
                     'price' => $item['listPrice'] ?? 0,
                     'discounted_price' => $item['salePrice'] ?? null,
                     'stock' => $item['quantity'] ?? 0,
+                    'brand_id' => $brand->id,
+                    'category_id' => $category->id,
+                    'external_brand_id' => (string)$brandId,
+                    'external_category_id' => (string)$catId,
                     'is_active' => true,
-                    // Eğer detaylı veri gelmiyorsa, varsayılan bir kategori atayalım
-                    'category_id' => Category::firstOrCreate(['slug' => 'genel'], ['name' => 'Genel Ürünler'])->id,
                 ]
             );
+
+            // 4. Görselleri Güncelle (Eğer link varsa)
+            if (isset($item['images'][0]['url'])) {
+                $product->images()->delete();
+                foreach($item['images'] as $img) {
+                    $product->images()->create(['image_url' => $img['url']]);
+                }
+            }
+
             $count++;
         }
 
-        return redirect()->route('admin.integration')->with('success', $count . ' adet ürün başarıyla veritabanına kaydedildi/güncellendi.');
+        return redirect()->route('admin.integration')->with('success', $count . ' adet ürün, markaları ve kategorileriyle birlikte Trendyol üzerinden veritabanına işlendi.');
     }
 
     public function productManagement()
