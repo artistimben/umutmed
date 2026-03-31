@@ -125,11 +125,13 @@ class AdminPanelController extends Controller
             );
 
             // 3. Ürünü Kaydet/Güncelle
+            $slugBase = \Illuminate\Support\Str::slug(($item['title'] ?? $item['modelCode']) . '-' . ($item['barcode'] ?? $item['modelCode']));
+            
             $product = Product::updateOrCreate(
                 ['barcode' => $item['barcode'], 'marketplace' => 'Trendyol'],
                 [
                     'title' => $item['title'] ?? ($item['modelCode'] ?? 'İsimsiz Ürün'),
-                    'slug' => \Illuminate\Support\Str::slug(($item['title'] ?? $item['modelCode']) . '-' . ($item['barcode'] ?? $item['modelCode'])),
+                    'slug' => $slugBase, // Barkodu slug'a ekleyerek çakışmayı önledik
                     'price' => $item['listPrice'] ?? 0,
                     'discounted_price' => $item['salePrice'] ?? null,
                     'stock' => $item['quantity'] ?? 0,
