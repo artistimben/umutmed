@@ -100,10 +100,15 @@ class AdminPanelController extends Controller
     public function syncIntegrationProducts(\App\Services\TrendyolService $trendyolService)
     {
         $response = $trendyolService->getIntegrationProducts(0, 100);
+        $categoryTree = $trendyolService->getCategoryTree(); // Trendyol hiyerarşisini çek
         
         if (!$response || !isset($response['content'])) {
             return back()->with('error', 'Trendyol verileri alınamadı.');
         }
+
+        // Hiyerarşi için basit bir harita oluştur
+        $categoryMap = [];
+        $this->flattenCategories($categoryTree['categories'] ?? [], $categoryMap);
 
         $count = 0;
         foreach ($response['content'] as $item) {
@@ -116,35 +121,24 @@ class AdminPanelController extends Controller
                 ['name' => $brandName, 'slug' => \Illuminate\Support\Str::slug($brandName . '-' . $brandId)]
             );
 
-            // 2. Kategoriyi Otomatik Oluştur/Eşleştir
+            // 2. Kategoriyi ve Üst Kategorilerini Hiyerarşik Oluştur
             $catId = $item['pimCategoryId'] ?? null;
-            $catName = $item['categoryName'] ?? ($catId ? "Kategori #$catId" : 'Genel Ürünler');
-            $category = Category::updateOrCreate(
-                ['external_id' => (string)$catId, 'marketplace' => 'Trendyol'],
-                ['name' => $catName, 'slug' => \Illuminate\Support\Str::slug($catName . '-' . $catId)]
-            );
+            $category = $this->syncCategoryWithParents($catId, $categoryMap);
 
-            // 3. Ürünü Akıllıca Eşleştir (Önce Barkod, Yoksa Slug üzerinden)
+            // 3. Ürünü Akıllıca Eşleştir (Barkod veya Slug)
             $slugBase = \Illuminate\Support\Str::slug(($item['title'] ?? $item['modelCode']) . '-' . ($item['barcode'] ?? $item['modelCode']));
-            
-            // Önce barkod ile ara
-            $product = Product::where('barcode', $item['barcode'])->first();
-            
-            // Barkodla bulunamadıysa, aynı slug (URL) kullanan ürün var mı diye bak (çakışmayı önlemek için)
-            if (!$product) {
-                $product = Product::where('slug', $slugBase)->first();
-            }
+            $product = Product::where('barcode', $item['barcode'])->first() ?? Product::where('slug', $slugBase)->first();
 
             $productData = [
                 'title' => $item['title'] ?? ($item['modelCode'] ?? 'İsimsiz Ürün'),
                 'slug' => $slugBase,
-                'barcode' => $item['barcode'], // Eğer slug üzerinden bulunduysa barkodu da güncelliyoruz
+                'barcode' => $item['barcode'],
                 'marketplace' => 'Trendyol',
                 'price' => $item['listPrice'] ?? 0,
                 'discounted_price' => $item['salePrice'] ?? null,
                 'stock' => $item['quantity'] ?? 0,
                 'brand_id' => $brand->id,
-                'category_id' => $category->id,
+                'category_id' => $category ? $category->id : null,
                 'external_brand_id' => (string)$brandId,
                 'external_category_id' => (string)$catId,
                 'is_active' => true,
@@ -156,7 +150,7 @@ class AdminPanelController extends Controller
                 $product = Product::create($productData);
             }
 
-            // 4. Görselleri Güncelle (Eğer link varsa)
+            // 4. Görselleri Güncelle
             if (isset($item['images'][0]['url'])) {
                 $product->images()->delete();
                 foreach($item['images'] as $img) {
@@ -167,7 +161,46 @@ class AdminPanelController extends Controller
             $count++;
         }
 
-        return redirect()->route('admin.integration')->with('success', $count . ' adet ürün, markaları ve kategorileriyle birlikte Trendyol üzerinden veritabanına işlendi.');
+        return redirect()->route('admin.integration')->with('success', $count . ' adet ürün, hiyerarşik kategorileriyle birlikte Tastyol üzerinden işlendi.');
+    }
+
+    /**
+     * Hiyerarşik kategori oluşturma yardımı (Özyinelemeli/Recursive)
+     */
+    private function syncCategoryWithParents($catId, &$categoryMap)
+    {
+        if (!$catId || !isset($categoryMap[$catId])) return null;
+
+        $catData = $categoryMap[$catId];
+        $parentId = null;
+
+        // Eğer bir üst kategorisi varsa, önce onu (ve onun üstünü) oluştur
+        if (!empty($catData['parentId'])) {
+            $parentCat = $this->syncCategoryWithParents($catData['parentId'], $categoryMap);
+            $parentId = $parentCat ? $parentCat->id : null;
+        }
+
+        return Category::updateOrCreate(
+            ['external_id' => (string)$catId, 'marketplace' => 'Trendyol'],
+            [
+                'name' => $catData['name'],
+                'slug' => \Illuminate\Support\Str::slug($catData['name'] . '-' . $catId),
+                'parent_id' => $parentId
+            ]
+        );
+    }
+
+    /**
+     * Trendyol ağaç yapısını düz listeye çevirme (Map)
+     */
+    private function flattenCategories($categories, &$map)
+    {
+        foreach ($categories as $cat) {
+            $map[$cat['id']] = $cat;
+            if (!empty($cat['subCategories'])) {
+                $this->flattenCategories($cat['subCategories'], $map);
+            }
+        }
     }
 
     public function productManagement()

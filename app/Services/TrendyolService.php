@@ -26,7 +26,6 @@ class TrendyolService
      */
     protected function client()
     {
-        // Trendyol Partner API kuralına göre: "SatıcıId - SelfIntegration"
         $userAgent = "{$this->sellerId} - SelfIntegration";
         
         return Http::withBasicAuth($this->apiKey, $this->apiSecret)
@@ -37,11 +36,22 @@ class TrendyolService
     }
 
     /**
-     * Fetch products from Trendyol
-     *
-     * @param int $page
-     * @param int $size
-     * @return array|null
+     * Fetch the full Category Tree from Trendyol (Hierarchical)
+     */
+    public function getCategoryTree(): ?array
+    {
+        $endpoint = "https://api.trendyol.com/sapigw/product-categories";
+        $response = $this->client()->get($endpoint);
+
+        if ($response->successful()) {
+            return $response->json();
+        }
+
+        return null;
+    }
+
+    /**
+     * Fetch products from Trendyol (Standard API)
      */
     public function getProducts(int $page = 0, int $size = 50, bool $approved = true): ?array
     {
@@ -58,7 +68,6 @@ class TrendyolService
         }
 
         Log::error('Trendyol getProducts API failed: ' . $response->body());
-        
         return null;
     }
 
