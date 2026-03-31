@@ -124,24 +124,37 @@ class AdminPanelController extends Controller
                 ['name' => $catName, 'slug' => \Illuminate\Support\Str::slug($catName . '-' . $catId)]
             );
 
-            // 3. Ürünü Kaydet/Güncelle
+            // 3. Ürünü Akıllıca Eşleştir (Önce Barkod, Yoksa Slug üzerinden)
             $slugBase = \Illuminate\Support\Str::slug(($item['title'] ?? $item['modelCode']) . '-' . ($item['barcode'] ?? $item['modelCode']));
             
-            $product = Product::updateOrCreate(
-                ['barcode' => $item['barcode'], 'marketplace' => 'Trendyol'],
-                [
-                    'title' => $item['title'] ?? ($item['modelCode'] ?? 'İsimsiz Ürün'),
-                    'slug' => $slugBase, // Barkodu slug'a ekleyerek çakışmayı önledik
-                    'price' => $item['listPrice'] ?? 0,
-                    'discounted_price' => $item['salePrice'] ?? null,
-                    'stock' => $item['quantity'] ?? 0,
-                    'brand_id' => $brand->id,
-                    'category_id' => $category->id,
-                    'external_brand_id' => (string)$brandId,
-                    'external_category_id' => (string)$catId,
-                    'is_active' => true,
-                ]
-            );
+            // Önce barkod ile ara
+            $product = Product::where('barcode', $item['barcode'])->first();
+            
+            // Barkodla bulunamadıysa, aynı slug (URL) kullanan ürün var mı diye bak (çakışmayı önlemek için)
+            if (!$product) {
+                $product = Product::where('slug', $slugBase)->first();
+            }
+
+            $productData = [
+                'title' => $item['title'] ?? ($item['modelCode'] ?? 'İsimsiz Ürün'),
+                'slug' => $slugBase,
+                'barcode' => $item['barcode'], // Eğer slug üzerinden bulunduysa barkodu da güncelliyoruz
+                'marketplace' => 'Trendyol',
+                'price' => $item['listPrice'] ?? 0,
+                'discounted_price' => $item['salePrice'] ?? null,
+                'stock' => $item['quantity'] ?? 0,
+                'brand_id' => $brand->id,
+                'category_id' => $category->id,
+                'external_brand_id' => (string)$brandId,
+                'external_category_id' => (string)$catId,
+                'is_active' => true,
+            ];
+
+            if ($product) {
+                $product->update($productData);
+            } else {
+                $product = Product::create($productData);
+            }
 
             // 4. Görselleri Güncelle (Eğer link varsa)
             if (isset($item['images'][0]['url'])) {
